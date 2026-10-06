@@ -152,7 +152,10 @@ class _Body extends StatelessWidget {
                   onPressed: () => monitor.signIn(account),
                   style: FilledButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    textStyle: Theme.of(context)
+                        .textTheme
+                        .labelLarge
+                        ?.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600),
                   ),
                   child: Text(waiting ? 'Open again' : 'Sign in'),
                 ),
