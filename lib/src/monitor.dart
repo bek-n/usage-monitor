@@ -1,18 +1,22 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import 'accounts.dart';
 import 'claude_cli.dart';
+import 'login_item.dart';
 import 'usage.dart';
 
 class Monitor extends ChangeNotifier {
-  Monitor({AccountStore? store, ClaudeCli? cli})
+  Monitor({AccountStore? store, ClaudeCli? cli, LoginItem? loginItem})
       : store = store ?? AccountStore(),
-        cli = cli ?? ClaudeCli();
+        cli = cli ?? ClaudeCli(),
+        loginItem = loginItem ?? LoginItem();
 
   final AccountStore store;
   final ClaudeCli cli;
+  final LoginItem loginItem;
 
   List<Account> _profiles = [];
   MonitorSettings _settings = const MonitorSettings();
@@ -24,12 +28,14 @@ class Monitor extends ChangeNotifier {
   Timer? _ticker;
   DateTime? _lastRefresh;
   bool _ready = false;
+  LoginItemStatus _loginItemStatus = LoginItemStatus.notRegistered;
 
   bool get ready => _ready;
   MonitorSettings get settings => _settings;
   List<Account> get profiles => List.unmodifiable(_profiles);
   DateTime? get lastRefresh => _lastRefresh;
   bool get isRefreshing => _loading.isNotEmpty;
+  LoginItemStatus get loginItemStatus => _loginItemStatus;
 
   AccountUsage? usageOf(Account account) => _usage[account.id];
   String? errorOf(Account account) => _errors[account.id];
@@ -64,6 +70,7 @@ class Monitor extends ChangeNotifier {
     _profiles = profiles;
     _settings = settings;
     cli.overridePath = settings.claudeBinary;
+    await _setUpLoginItem();
     _ready = true;
     notifyListeners();
     _scheduleRefresh();
@@ -188,6 +195,27 @@ class Monitor extends ChangeNotifier {
     if (intervalChanged) _scheduleRefresh();
     notifyListeners();
     if (binaryChanged) await refreshAll();
+  }
+
+  Future<void> _setUpLoginItem() async {
+    try {
+      if (_settings.loginItemSetUp) {
+        _loginItemStatus = await loginItem.status();
+        return;
+      }
+      _loginItemStatus = await loginItem.setEnabled(true);
+      _settings = _settings.copyWith(loginItemSetUp: true);
+      await _save();
+    } on PlatformException catch (_) {
+      _loginItemStatus = LoginItemStatus.notRegistered;
+    } on MissingPluginException catch (_) {
+      _loginItemStatus = LoginItemStatus.unsupported;
+    }
+  }
+
+  Future<void> setOpenAtLogin(bool enabled) async {
+    _loginItemStatus = await loginItem.setEnabled(enabled);
+    notifyListeners();
   }
 
   Future<void> _save() => store.save(_profiles, _settings);

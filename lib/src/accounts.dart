@@ -58,33 +58,39 @@ class MonitorSettings {
     this.refreshMinutes = 5,
     this.claudeBinary,
     this.showCurrentLogin = true,
+    this.loginItemSetUp = false,
   });
 
   final int refreshMinutes;
   final String? claudeBinary;
   final bool showCurrentLogin;
+  final bool loginItemSetUp;
 
   MonitorSettings copyWith({
     int? refreshMinutes,
     String? Function()? claudeBinary,
     bool? showCurrentLogin,
+    bool? loginItemSetUp,
   }) =>
       MonitorSettings(
         refreshMinutes: refreshMinutes ?? this.refreshMinutes,
         claudeBinary: claudeBinary != null ? claudeBinary() : this.claudeBinary,
         showCurrentLogin: showCurrentLogin ?? this.showCurrentLogin,
+        loginItemSetUp: loginItemSetUp ?? this.loginItemSetUp,
       );
 
   Map<String, dynamic> toJson() => {
         'refreshMinutes': refreshMinutes,
         if (claudeBinary != null) 'claudeBinary': claudeBinary,
         'showCurrentLogin': showCurrentLogin,
+        'loginItemSetUp': loginItemSetUp,
       };
 
   factory MonitorSettings.fromJson(Map<String, dynamic> json) => MonitorSettings(
         refreshMinutes: (json['refreshMinutes'] as num?)?.toInt() ?? 5,
         claudeBinary: json['claudeBinary'] as String?,
         showCurrentLogin: json['showCurrentLogin'] as bool? ?? true,
+        loginItemSetUp: json['loginItemSetUp'] as bool? ?? false,
       );
 }
 

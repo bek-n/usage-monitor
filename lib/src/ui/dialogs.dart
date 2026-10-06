@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../accounts.dart';
+import '../login_item.dart';
 import '../monitor.dart';
 import 'theme.dart';
 
@@ -143,6 +144,8 @@ Future<bool> showRemoveDialog(BuildContext context, Account account) async {
 
 Future<void> showSettingsDialog(BuildContext context, Monitor monitor, {required VoidCallback onQuit}) async {
   var settings = monitor.settings;
+  var openAtLogin = monitor.loginItemStatus == LoginItemStatus.enabled;
+  final loginItemSupported = monitor.loginItemStatus != LoginItemStatus.unsupported;
   final binary = TextEditingController(text: settings.claudeBinary ?? '');
   final detected = await monitor.cli.detect();
   if (!context.mounted) return;
@@ -175,6 +178,17 @@ Future<void> showSettingsDialog(BuildContext context, Monitor monitor, {required
                 ],
               ),
               const SizedBox(height: 4),
+              if (loginItemSupported)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('Open at login', style: TextStyle(fontSize: 13)),
+                  subtitle: monitor.loginItemStatus == LoginItemStatus.requiresApproval
+                      ? const _Hint('Allow it in System Settings → General → Login Items.')
+                      : null,
+                  value: openAtLogin,
+                  onChanged: (v) => setState(() => openAtLogin = v),
+                ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 dense: true,
@@ -222,5 +236,10 @@ Future<void> showSettingsDialog(BuildContext context, Monitor monitor, {required
       ),
     ),
   );
-  if (saved != null) await monitor.updateSettings(saved);
+  if (saved == null) return;
+  await monitor.updateSettings(saved);
+  final wasOpenAtLogin = monitor.loginItemStatus == LoginItemStatus.enabled;
+  if (loginItemSupported && openAtLogin != wasOpenAtLogin) {
+    await monitor.setOpenAtLogin(openAtLogin);
+  }
 }

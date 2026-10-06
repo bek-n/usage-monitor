@@ -1,6 +1,7 @@
 import 'package:usage_monitor/main.dart';
 import 'package:usage_monitor/src/accounts.dart';
 import 'package:usage_monitor/src/claude_cli.dart';
+import 'package:usage_monitor/src/login_item.dart';
 import 'package:usage_monitor/src/monitor.dart';
 import 'package:usage_monitor/src/tray_panel.dart';
 import 'package:usage_monitor/src/usage.dart';
@@ -35,6 +36,20 @@ class FakeCli extends ClaudeCli {
   }
 }
 
+class FakeLoginItem extends LoginItem {
+  LoginItemStatus current = LoginItemStatus.notRegistered;
+  final calls = <bool>[];
+
+  @override
+  Future<LoginItemStatus> status() async => current;
+
+  @override
+  Future<LoginItemStatus> setEnabled(bool enabled) async {
+    calls.add(enabled);
+    return current = enabled ? LoginItemStatus.enabled : LoginItemStatus.notRegistered;
+  }
+}
+
 AccountUsage signedIn(String email, double session, double weekly) {
   final now = DateTime.now();
   return AccountUsage(
@@ -53,12 +68,15 @@ void main() {
   const spare = Account(id: 'spare', label: 'Spare', configDir: '/tmp/.claude-accounts/spare');
 
   late Monitor monitor;
+  late FakeLoginItem loginItem;
 
   setUp(() {
     final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(const MethodChannel('window_manager'), (_) async => null);
     messenger.setMockMethodCallHandler(const MethodChannel('tray_manager'), (_) async => null);
+    loginItem = FakeLoginItem();
     monitor = Monitor(
+      loginItem: loginItem,
       store: MemoryStore([work, personal, spare]),
       cli: FakeCli({
         Account.currentLoginId: signedIn('work@example.com', 71, 23),
@@ -102,6 +120,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Refresh every'), findsOneWidget);
+    expect(find.text('Open at login'), findsOneWidget);
     expect(find.text('Found: /usr/local/bin/claude'), findsOneWidget);
+  });
+
+  testWidgets('turns on open-at-login once, on first launch', (tester) async {
+    await pumpPanel(tester);
+
+    expect(loginItem.calls, [true]);
+    expect(monitor.loginItemStatus, LoginItemStatus.enabled);
+    expect(monitor.settings.loginItemSetUp, isTrue);
   });
 }
