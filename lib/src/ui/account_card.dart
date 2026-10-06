@@ -185,6 +185,27 @@ class _Body extends StatelessWidget {
                 color: palette.muted,
                 text: 'No usage windows reported yet.',
               ),
+            if (monitor.ownCopiesOf(account).isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Tooltip(
+                message: 'This account has its own ${monitor.ownCopiesOf(account).join(', ')}, '
+                    'so it is not linked to ~/.claude. Remove it from ${account.shortConfigDir} to share it.',
+                child: Row(
+                  children: [
+                    Icon(Icons.link_off_rounded, size: 13, color: palette.muted),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        'Not shared: ${monitor.ownCopiesOf(account).join(', ')}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 11.5, color: palette.muted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             if (error != null) ...[
               const SizedBox(height: 10),
               Tooltip(

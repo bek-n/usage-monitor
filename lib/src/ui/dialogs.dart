@@ -192,7 +192,15 @@ Future<void> showSettingsDialog(BuildContext context, Monitor monitor, {required
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 dense: true,
-                title: const Text('Show current Claude Code login', style: TextStyle(fontSize: 13)),
+                title: const Text('Same settings and memory for every account', style: TextStyle(fontSize: 13)),
+                subtitle: const _Hint('Links settings, skills, memory and chat history from ~/.claude into each account.'),
+                value: settings.shareWithMain,
+                onChanged: (v) => setState(() => settings = settings.copyWith(shareWithMain: v)),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Show main login', style: TextStyle(fontSize: 13)),
                 subtitle: const _Hint('Shown only when it is not one of your accounts below.'),
                 value: settings.showCurrentLogin,
                 onChanged: (v) => setState(() => settings = settings.copyWith(showCurrentLogin: v)),

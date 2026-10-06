@@ -4,6 +4,7 @@ import 'package:usage_monitor/src/claude_cli.dart';
 import 'package:usage_monitor/src/editor_settings.dart';
 import 'package:usage_monitor/src/login_item.dart';
 import 'package:usage_monitor/src/monitor.dart';
+import 'package:usage_monitor/src/profile_sync.dart';
 import 'package:usage_monitor/src/tray_panel.dart';
 import 'package:usage_monitor/src/usage.dart';
 import 'package:flutter/services.dart';
@@ -68,6 +69,16 @@ class FakeEditorSettings extends EditorSettings {
   }
 }
 
+class FakeProfileSync extends ProfileSync {
+  final shared = <String>[];
+
+  @override
+  Future<ShareReport> share(String profileDir) async {
+    shared.add(profileDir);
+    return ShareReport(ownCopies: profileDir.endsWith('spare') ? const ['settings.json'] : const []);
+  }
+}
+
 AccountUsage signedIn(String email, double session, double weekly) {
   final now = DateTime.now();
   return AccountUsage(
@@ -88,6 +99,7 @@ void main() {
   late Monitor monitor;
   late FakeLoginItem loginItem;
   late FakeEditorSettings editorSettings;
+  late FakeProfileSync profileSync;
 
   setUp(() {
     final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -95,7 +107,9 @@ void main() {
     messenger.setMockMethodCallHandler(const MethodChannel('tray_manager'), (_) async => null);
     loginItem = FakeLoginItem();
     editorSettings = FakeEditorSettings();
+    profileSync = FakeProfileSync();
     monitor = Monitor(
+      profileSync: profileSync,
       loginItem: loginItem,
       editorSettings: editorSettings,
       store: MemoryStore([work, personal, spare]),
@@ -171,5 +185,13 @@ void main() {
 
     expect(editorSettings.writes, [personal.configDir, null]);
     expect(monitor.isInEditor(work), isTrue);
+  });
+
+  testWidgets('shares the main login with every account and flags own copies', (tester) async {
+    await pumpPanel(tester);
+
+    expect(profileSync.shared.toSet(), {work.configDir, personal.configDir, spare.configDir});
+    expect(monitor.ownCopiesOf(spare), ['settings.json']);
+    expect(monitor.ownCopiesOf(work), isEmpty);
   });
 }

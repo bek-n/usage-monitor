@@ -8,19 +8,27 @@ import 'accounts.dart';
 import 'claude_cli.dart';
 import 'editor_settings.dart';
 import 'login_item.dart';
+import 'profile_sync.dart';
 import 'usage.dart';
 
 class Monitor extends ChangeNotifier {
-  Monitor({AccountStore? store, ClaudeCli? cli, LoginItem? loginItem, EditorSettings? editorSettings})
-      : store = store ?? AccountStore(),
+  Monitor({
+    AccountStore? store,
+    ClaudeCli? cli,
+    LoginItem? loginItem,
+    EditorSettings? editorSettings,
+    ProfileSync? profileSync,
+  })  : store = store ?? AccountStore(),
         cli = cli ?? ClaudeCli(),
         loginItem = loginItem ?? LoginItem(),
-        editorSettings = editorSettings ?? EditorSettings();
+        editorSettings = editorSettings ?? EditorSettings(),
+        profileSync = profileSync ?? ProfileSync();
 
   final AccountStore store;
   final ClaudeCli cli;
   final LoginItem loginItem;
   final EditorSettings editorSettings;
+  final ProfileSync profileSync;
 
   List<Account> _profiles = [];
   MonitorSettings _settings = const MonitorSettings();
@@ -34,6 +42,7 @@ class Monitor extends ChangeNotifier {
   bool _ready = false;
   LoginItemStatus _loginItemStatus = LoginItemStatus.notRegistered;
   List<Editor> _editors = [];
+  final Map<String, List<String>> _ownCopies = {};
   String? _editorConfigDir;
 
   bool get ready => _ready;
@@ -57,6 +66,21 @@ class Monitor extends ChangeNotifier {
   }
 
   Editor? get editor => _editors.isEmpty ? null : _editors.first;
+
+  List<String> ownCopiesOf(Account account) => _ownCopies[account.id] ?? const [];
+
+  Future<void> _shareProfiles([Iterable<Account>? accounts]) async {
+    if (!_settings.shareWithMain) {
+      _ownCopies.clear();
+      return;
+    }
+    for (final account in accounts ?? _profiles) {
+      try {
+        final report = await profileSync.share(account.configDir);
+        _ownCopies[account.id] = report.ownCopies;
+      } on FileSystemException catch (_) {}
+    }
+  }
 
   bool isInEditor(Account account) {
     if (editor == null) return false;
@@ -115,6 +139,7 @@ class Monitor extends ChangeNotifier {
     cli.overridePath = settings.claudeBinary;
     await _setUpLoginItem();
     await _loadEditorState();
+    await _shareProfiles();
     _ready = true;
     notifyListeners();
     _scheduleRefresh();
@@ -147,6 +172,7 @@ class Monitor extends ChangeNotifier {
 
   Future<void> refreshAll() async {
     await _loadEditorState();
+    await _shareProfiles();
     await Future.wait(_polledAccounts.map(refresh));
     _lastRefresh = DateTime.now();
     notifyListeners();
@@ -173,6 +199,7 @@ class Monitor extends ChangeNotifier {
     final account = await store.createProfile(label: label, email: email);
     _profiles = [..._profiles, account];
     await _save();
+    await _shareProfiles([account]);
     notifyListeners();
     await signIn(account);
     return account;
@@ -234,7 +261,9 @@ class Monitor extends ChangeNotifier {
   Future<void> updateSettings(MonitorSettings settings) async {
     final intervalChanged = settings.refreshMinutes != _settings.refreshMinutes;
     final binaryChanged = settings.claudeBinary != _settings.claudeBinary;
+    final sharingTurnedOn = settings.shareWithMain && !_settings.shareWithMain;
     _settings = settings;
+    if (sharingTurnedOn || !settings.shareWithMain) await _shareProfiles();
     cli.overridePath = settings.claudeBinary;
     await _save();
     if (intervalChanged) _scheduleRefresh();
