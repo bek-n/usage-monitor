@@ -1,6 +1,7 @@
 import 'package:usage_monitor/main.dart';
 import 'package:usage_monitor/src/accounts.dart';
 import 'package:usage_monitor/src/claude_cli.dart';
+import 'package:usage_monitor/src/editor_settings.dart';
 import 'package:usage_monitor/src/login_item.dart';
 import 'package:usage_monitor/src/monitor.dart';
 import 'package:usage_monitor/src/tray_panel.dart';
@@ -50,6 +51,23 @@ class FakeLoginItem extends LoginItem {
   }
 }
 
+class FakeEditorSettings extends EditorSettings {
+  String? dir;
+  final writes = <String?>[];
+
+  @override
+  Future<List<Editor>> detect() async => [EditorSettings.known.first];
+
+  @override
+  Future<String?> configDir(Editor editor) async => dir;
+
+  @override
+  Future<void> setConfigDir(Editor editor, String? dir) async {
+    writes.add(dir);
+    this.dir = dir;
+  }
+}
+
 AccountUsage signedIn(String email, double session, double weekly) {
   final now = DateTime.now();
   return AccountUsage(
@@ -69,14 +87,17 @@ void main() {
 
   late Monitor monitor;
   late FakeLoginItem loginItem;
+  late FakeEditorSettings editorSettings;
 
   setUp(() {
     final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(const MethodChannel('window_manager'), (_) async => null);
     messenger.setMockMethodCallHandler(const MethodChannel('tray_manager'), (_) async => null);
     loginItem = FakeLoginItem();
+    editorSettings = FakeEditorSettings();
     monitor = Monitor(
       loginItem: loginItem,
+      editorSettings: editorSettings,
       store: MemoryStore([work, personal, spare]),
       cli: FakeCli({
         Account.currentLoginId: signedIn('work@example.com', 71, 23),
@@ -98,11 +119,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('shows every account and marks the one Claude Code uses', (tester) async {
+  testWidgets('shows every account and marks the one VS Code uses', (tester) async {
     await pumpPanel(tester);
 
-    expect(find.text('Current login'), findsNothing);
-    expect(find.text('In Claude Code'), findsOneWidget);
+    expect(find.text('Main login'), findsNothing);
+    expect(find.text('In VS Code'), findsOneWidget);
+    expect(monitor.isInEditor(work), isTrue);
+    expect(find.text('Switch'), findsOneWidget);
     expect(find.text('93%'), findsOneWidget);
     expect(find.text('78%'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
@@ -130,5 +153,23 @@ void main() {
     expect(loginItem.calls, [true]);
     expect(monitor.loginItemStatus, LoginItemStatus.enabled);
     expect(monitor.settings.loginItemSetUp, isTrue);
+  });
+
+  testWidgets('switches VS Code to another account and back to the main login', (tester) async {
+    await pumpPanel(tester);
+
+    await tester.tap(find.text('Switch'));
+    await tester.pumpAndSettle();
+
+    expect(editorSettings.writes, [personal.configDir]);
+    expect(monitor.isInEditor(personal), isTrue);
+    expect(monitor.isInEditor(work), isFalse);
+    expect(find.text('VS Code now uses Personal. Start a new Claude chat there to use it.'), findsOneWidget);
+
+    await tester.tap(find.text('Switch'));
+    await tester.pumpAndSettle();
+
+    expect(editorSettings.writes, [personal.configDir, null]);
+    expect(monitor.isInEditor(work), isTrue);
   });
 }

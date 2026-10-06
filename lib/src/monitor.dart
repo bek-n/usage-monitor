@@ -1,22 +1,26 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'accounts.dart';
 import 'claude_cli.dart';
+import 'editor_settings.dart';
 import 'login_item.dart';
 import 'usage.dart';
 
 class Monitor extends ChangeNotifier {
-  Monitor({AccountStore? store, ClaudeCli? cli, LoginItem? loginItem})
+  Monitor({AccountStore? store, ClaudeCli? cli, LoginItem? loginItem, EditorSettings? editorSettings})
       : store = store ?? AccountStore(),
         cli = cli ?? ClaudeCli(),
-        loginItem = loginItem ?? LoginItem();
+        loginItem = loginItem ?? LoginItem(),
+        editorSettings = editorSettings ?? EditorSettings();
 
   final AccountStore store;
   final ClaudeCli cli;
   final LoginItem loginItem;
+  final EditorSettings editorSettings;
 
   List<Account> _profiles = [];
   MonitorSettings _settings = const MonitorSettings();
@@ -29,6 +33,8 @@ class Monitor extends ChangeNotifier {
   DateTime? _lastRefresh;
   bool _ready = false;
   LoginItemStatus _loginItemStatus = LoginItemStatus.notRegistered;
+  List<Editor> _editors = [];
+  String? _editorConfigDir;
 
   bool get ready => _ready;
   MonitorSettings get settings => _settings;
@@ -44,16 +50,53 @@ class Monitor extends ChangeNotifier {
 
   String? get _currentLoginEmail => _usage[Account.currentLoginId]?.email;
 
-  bool isActiveInClaudeCode(Account account) {
+  bool _matchesMainLogin(Account account) {
     if (account.isCurrentLogin) return false;
     final email = _usage[account.id]?.email;
     return email != null && email == _currentLoginEmail;
   }
 
+  Editor? get editor => _editors.isEmpty ? null : _editors.first;
+
+  bool isInEditor(Account account) {
+    if (editor == null) return false;
+    final dir = _editorConfigDir;
+    if (dir == null) return account.isCurrentLogin || _matchesMainLogin(account);
+    return !account.isCurrentLogin && _samePath(account.configDir, dir);
+  }
+
+  bool canSwitch(Account account) =>
+      editor != null &&
+      _usage[account.id]?.loginState == LoginState.signedIn &&
+      !isInEditor(account);
+
+  Future<void> switchEditorTo(Account account) async {
+    final target = account.isCurrentLogin || _matchesMainLogin(account) ? null : account.configDir;
+    for (final e in _editors) {
+      await editorSettings.setConfigDir(e, target);
+    }
+    _editorConfigDir = target;
+    notifyListeners();
+  }
+
+  Future<void> _loadEditorState() async {
+    try {
+      _editors = await editorSettings.detect();
+      final primary = editor;
+      _editorConfigDir = primary == null ? null : await editorSettings.configDir(primary);
+    } on FileSystemException catch (_) {
+    } on FormatException catch (_) {}
+  }
+
+  static bool _samePath(String a, String b) {
+    String clean(String p) => p.endsWith('/') ? p.substring(0, p.length - 1) : p;
+    return clean(a) == clean(b);
+  }
+
   List<Account> get _polledAccounts => [Account.currentLogin, ..._profiles];
 
   List<Account> get visibleAccounts {
-    final showCurrent = _settings.showCurrentLogin && !_profiles.any(isActiveInClaudeCode);
+    final showCurrent = _settings.showCurrentLogin && !_profiles.any(_matchesMainLogin);
     return [if (showCurrent) Account.currentLogin, ..._profiles];
   }
 
@@ -71,6 +114,7 @@ class Monitor extends ChangeNotifier {
     _settings = settings;
     cli.overridePath = settings.claudeBinary;
     await _setUpLoginItem();
+    await _loadEditorState();
     _ready = true;
     notifyListeners();
     _scheduleRefresh();
@@ -102,6 +146,7 @@ class Monitor extends ChangeNotifier {
   }
 
   Future<void> refreshAll() async {
+    await _loadEditorState();
     await Future.wait(_polledAccounts.map(refresh));
     _lastRefresh = DateTime.now();
     notifyListeners();

@@ -15,7 +15,7 @@ class Account {
 
   static final currentLogin = Account(
     id: currentLoginId,
-    label: 'Current login',
+    label: 'Main login',
     configDir: '${Platform.environment['HOME']}/.claude',
   );
 

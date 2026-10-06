@@ -21,12 +21,13 @@ class AccountCard extends StatelessWidget {
     final palette = context.palette;
     final usage = monitor.usageOf(account);
     final error = monitor.errorOf(account);
+    final inEditor = monitor.isInEditor(account);
 
     return Container(
       decoration: BoxDecoration(
         color: palette.card,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: palette.border),
+        border: Border.all(color: inEditor ? palette.accent.withValues(alpha: 0.55) : palette.border),
       ),
       padding: const EdgeInsets.fromLTRB(14, 12, 6, 14),
       child: Column(
@@ -56,6 +57,7 @@ class _Header extends StatelessWidget {
     final palette = context.palette;
     final subtitle = usage?.email ?? account.email ?? account.shortConfigDir;
     final plan = usage?.plan;
+    final editor = monitor.editor;
 
     return Row(
       children: [
@@ -75,10 +77,13 @@ class _Header extends StatelessWidget {
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: palette.text),
                     ),
                   ),
-                  if (monitor.isActiveInClaudeCode(account) ||
-                      (account.isCurrentLogin && usage?.loginState == LoginState.signedIn)) ...[
+                  if (plan != null) ...[
                     const SizedBox(width: 6),
-                    const _InUseChip(),
+                    _PlanBadge(plan: plan),
+                  ],
+                  if (editor != null && monitor.isInEditor(account)) ...[
+                    const SizedBox(width: 6),
+                    _InUseChip(editorName: editor.name),
                   ],
                 ],
               ),
@@ -92,9 +97,9 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
-        if (plan != null) ...[
+        if (editor != null && monitor.canSwitch(account)) ...[
           const SizedBox(width: 8),
-          _PlanBadge(plan: plan),
+          _SwitchButton(monitor: monitor, account: account, editorName: editor.name),
         ],
         _CardMenu(monitor: monitor, tray: tray, account: account, usage: usage),
       ],
@@ -353,19 +358,69 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-class _InUseChip extends StatelessWidget {
-  const _InUseChip();
+class _SwitchButton extends StatelessWidget {
+  const _SwitchButton({required this.monitor, required this.account, required this.editorName});
+
+  final Monitor monitor;
+  final Account account;
+  final String editorName;
+
+  Future<void> _switch(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await monitor.switchEditorTo(account);
+      messenger.showSnackBar(SnackBar(
+        content: Text('$editorName now uses ${account.label}. Start a new Claude chat there to use it.'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+      ));
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(
+        content: Text("Couldn't switch $editorName: $error"),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     return Tooltip(
-      message: 'The account Claude Code is signed in with right now (~/.claude)',
+      message: 'Use this account in Claude Code for $editorName',
+      child: OutlinedButton(
+        onPressed: () => _switch(context),
+        style: OutlinedButton.styleFrom(
+          visualDensity: VisualDensity.compact,
+          minimumSize: const Size(0, 28),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          foregroundColor: palette.accent,
+          side: BorderSide(color: palette.border),
+          textStyle: Theme.of(context)
+              .textTheme
+              .labelLarge
+              ?.copyWith(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+        child: const Text('Switch'),
+      ),
+    );
+  }
+}
+
+class _InUseChip extends StatelessWidget {
+  const _InUseChip({required this.editorName});
+
+  final String editorName;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Tooltip(
+      message: 'Claude Code in $editorName uses this account',
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(color: palette.accentSoft, borderRadius: BorderRadius.circular(5)),
         child: Text(
-          'In Claude Code',
+          'In $editorName',
           style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: palette.accent),
         ),
       ),

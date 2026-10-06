@@ -145,13 +145,24 @@ class TrayPanel with TrayListener, WindowListener {
 
   @override
   void onTrayIconRightMouseDown() async {
+    final editor = monitor.editor;
+    final accounts = monitor.visibleAccounts;
     await trayManager.setContextMenu(Menu(items: [
-      for (final account in monitor.visibleAccounts)
-        MenuItem(
-          label: '${account.label} — ${_summary(monitor.usageOf(account))}',
-          disabled: true,
-        ),
-      if (monitor.visibleAccounts.isNotEmpty) MenuItem.separator(),
+      if (editor != null && accounts.isNotEmpty) MenuItem(label: 'Switch ${editor.name} account', disabled: true),
+      for (final account in accounts)
+        if (editor != null)
+          MenuItem.checkbox(
+            key: 'switch:${account.id}',
+            label: '${account.label} — ${_summary(monitor.usageOf(account))}',
+            checked: monitor.isInEditor(account),
+            disabled: !monitor.isInEditor(account) && !monitor.canSwitch(account),
+          )
+        else
+          MenuItem(
+            label: '${account.label} — ${_summary(monitor.usageOf(account))}',
+            disabled: true,
+          ),
+      if (accounts.isNotEmpty) MenuItem.separator(),
       MenuItem(key: 'open', label: 'Open Usage Monitor'),
       MenuItem(key: 'refresh', label: 'Refresh now'),
       MenuItem.separator(),
@@ -162,7 +173,16 @@ class TrayPanel with TrayListener, WindowListener {
 
   @override
   void onTrayMenuItemClick(MenuItem menuItem) {
-    switch (menuItem.key) {
+    final key = menuItem.key ?? '';
+    if (key.startsWith('switch:')) {
+      final id = key.substring('switch:'.length);
+      final account = monitor.visibleAccounts.where((a) => a.id == id).firstOrNull;
+      if (account != null && monitor.canSwitch(account)) {
+        monitor.switchEditorTo(account).catchError((Object _) {});
+      }
+      return;
+    }
+    switch (key) {
       case 'open':
         showPanel();
       case 'refresh':
