@@ -26,9 +26,10 @@ Future<void> main() async {
 
   runApp(UsageMonitorApp(monitor: monitor, tray: tray));
 
+  await monitor.load();
   await tray.init();
-  await tray.showPanel();
-  await monitor.init();
+  if (monitor.profiles.isEmpty) await tray.showPanel();
+  await monitor.start();
 }
 
 class UsageMonitorApp extends StatelessWidget {

@@ -177,6 +177,26 @@ Future<void> showSettingsDialog(BuildContext context, Monitor monitor, {required
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              const Text('Open the panel from', style: TextStyle(fontSize: 13)),
+              const SizedBox(height: 6),
+              SegmentedButton<PanelPlacement>(
+                showSelectedIcon: false,
+                style: SegmentedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  textStyle: const TextStyle(fontSize: 12.5),
+                ),
+                segments: const [
+                  ButtonSegment(value: PanelPlacement.menuBar, label: Text('Menu bar')),
+                  ButtonSegment(value: PanelPlacement.screenEdge, label: Text('Right edge of screen')),
+                ],
+                selected: {settings.placement},
+                onSelectionChanged: (s) => setState(() => settings = settings.copyWith(placement: s.first)),
+              ),
+              const SizedBox(height: 6),
+              _Hint(settings.placement == PanelPlacement.screenEdge
+                  ? 'Rest the pointer on the right edge of the screen and the panel slides in. The menu bar icon is hidden.'
+                  : 'Click the gauge icon in the menu bar.'),
               const SizedBox(height: 4),
               if (loginItemSupported)
                 SwitchListTile(

@@ -5,11 +5,15 @@ import 'package:screen_retriever/screen_retriever.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'accounts.dart';
+import 'edge_panel.dart';
 import 'monitor.dart';
 import 'usage.dart';
 
 class TrayPanel with TrayListener, WindowListener {
-  TrayPanel(this.monitor);
+  TrayPanel(this.monitor) {
+    edge = EdgePanel(onShown: () => monitor.refreshIfStale());
+  }
 
   static const panelWidth = 380.0;
   static const minPanelHeight = 180.0;
@@ -17,6 +21,9 @@ class TrayPanel with TrayListener, WindowListener {
 
   final Monitor monitor;
   final pinned = ValueNotifier<bool>(false);
+  late final EdgePanel edge;
+  PanelPlacement? _placement;
+  bool _trayVisible = false;
   DateTime _hiddenAt = DateTime(0);
   double _panelHeight = 420;
   double _contentHeight = 420;
@@ -26,12 +33,40 @@ class TrayPanel with TrayListener, WindowListener {
   Future<void> init() async {
     await windowManager.setPreventClose(true);
     await windowManager.setVisibleOnAllWorkspaces(true, visibleOnFullScreen: true);
-    await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
+    edge.listen();
     trayManager.addListener(this);
     windowManager.addListener(this);
-    monitor.addListener(_syncTray);
-    pinned.addListener(() => windowManager.setAlwaysOnTop(pinned.value));
-    await _syncTray();
+    monitor.addListener(_onMonitorChanged);
+    pinned.addListener(() {
+      windowManager.setAlwaysOnTop(pinned.value);
+      edge.setPinned(pinned.value);
+    });
+    await _onMonitorChanged();
+  }
+
+  bool get edgeMode => _placement == PanelPlacement.screenEdge;
+
+  Future<void> _onMonitorChanged() async {
+    final placement = monitor.settings.placement;
+    if (placement != _placement) {
+      final previous = _placement;
+      _placement = placement;
+      final wasVisible = previous != null && await windowManager.isVisible();
+      if (wasVisible) {
+        await (previous == PanelPlacement.screenEdge ? edge.hide() : windowManager.hide());
+      }
+      await edge.setEnabled(edgeMode);
+      if (edgeMode && _trayVisible) {
+        await trayManager.destroy();
+        _trayVisible = false;
+        _lastTitle = '';
+      } else if (!edgeMode && !_trayVisible) {
+        await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
+        _trayVisible = true;
+      }
+      if (wasVisible) await showPanel();
+    }
+    if (_trayVisible) await _syncTray();
   }
 
   Future<void> _syncTray() async {
@@ -69,6 +104,11 @@ class TrayPanel with TrayListener, WindowListener {
   }
 
   Future<void> showPanel() async {
+    if (edgeMode) {
+      await edge.resize(_panelHeight);
+      await edge.show();
+      return;
+    }
     await windowManager.setSize(Size(panelWidth, _panelHeight));
     await windowManager.setPosition(await _panelPosition());
     await windowManager.show();
@@ -107,6 +147,10 @@ class TrayPanel with TrayListener, WindowListener {
 
   Future<void> hidePanel() async {
     _hiddenAt = DateTime.now();
+    if (edgeMode) {
+      await edge.hide();
+      return;
+    }
     await windowManager.hide();
   }
 
@@ -117,7 +161,11 @@ class TrayPanel with TrayListener, WindowListener {
         .ceilToDouble();
     if ((target - _panelHeight).abs() < 1) return;
     _panelHeight = target;
-    await windowManager.setSize(Size(panelWidth, target));
+    if (edgeMode) {
+      await edge.resize(target);
+    } else {
+      await windowManager.setSize(Size(panelWidth, target));
+    }
   }
 
   Future<T> withRoomForDialog<T>(Future<T> Function() openDialog, {double height = 560}) async {

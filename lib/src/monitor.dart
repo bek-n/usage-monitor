@@ -133,10 +133,19 @@ class Monitor extends ChangeNotifier {
   }
 
   Future<void> init() async {
+    await load();
+    await start();
+  }
+
+  Future<void> load() async {
     final (profiles, settings) = await store.load();
     _profiles = profiles;
     _settings = settings;
     cli.overridePath = settings.claudeBinary;
+    notifyListeners();
+  }
+
+  Future<void> start() async {
     await _setUpLoginItem();
     await _loadEditorState();
     await _shareProfiles();

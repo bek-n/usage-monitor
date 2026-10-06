@@ -53,6 +53,8 @@ class Account {
       );
 }
 
+enum PanelPlacement { menuBar, screenEdge }
+
 class MonitorSettings {
   const MonitorSettings({
     this.refreshMinutes = 5,
@@ -60,6 +62,7 @@ class MonitorSettings {
     this.showCurrentLogin = true,
     this.loginItemSetUp = false,
     this.shareWithMain = true,
+    this.placement = PanelPlacement.menuBar,
   });
 
   final int refreshMinutes;
@@ -67,6 +70,7 @@ class MonitorSettings {
   final bool showCurrentLogin;
   final bool loginItemSetUp;
   final bool shareWithMain;
+  final PanelPlacement placement;
 
   MonitorSettings copyWith({
     int? refreshMinutes,
@@ -74,6 +78,7 @@ class MonitorSettings {
     bool? showCurrentLogin,
     bool? loginItemSetUp,
     bool? shareWithMain,
+    PanelPlacement? placement,
   }) =>
       MonitorSettings(
         refreshMinutes: refreshMinutes ?? this.refreshMinutes,
@@ -81,6 +86,7 @@ class MonitorSettings {
         showCurrentLogin: showCurrentLogin ?? this.showCurrentLogin,
         loginItemSetUp: loginItemSetUp ?? this.loginItemSetUp,
         shareWithMain: shareWithMain ?? this.shareWithMain,
+        placement: placement ?? this.placement,
       );
 
   Map<String, dynamic> toJson() => {
@@ -89,6 +95,7 @@ class MonitorSettings {
         'showCurrentLogin': showCurrentLogin,
         'loginItemSetUp': loginItemSetUp,
         'shareWithMain': shareWithMain,
+        'placement': placement.name,
       };
 
   factory MonitorSettings.fromJson(Map<String, dynamic> json) => MonitorSettings(
@@ -97,6 +104,7 @@ class MonitorSettings {
         showCurrentLogin: json['showCurrentLogin'] as bool? ?? true,
         loginItemSetUp: json['loginItemSetUp'] as bool? ?? false,
         shareWithMain: json['shareWithMain'] as bool? ?? true,
+        placement: PanelPlacement.values.asNameMap()[json['placement']] ?? PanelPlacement.menuBar,
       );
 }
 

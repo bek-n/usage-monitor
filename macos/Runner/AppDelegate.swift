@@ -8,6 +8,10 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   override func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+    if let edgePanel = (mainFlutterWindow as? MainFlutterWindow)?.edgePanel, edgePanel.enabled {
+      edgePanel.showFromReopen()
+      return true
+    }
     mainFlutterWindow?.makeKeyAndOrderFront(nil)
     NSApp.activate(ignoringOtherApps: true)
     return true
