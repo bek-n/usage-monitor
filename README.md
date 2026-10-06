@@ -19,6 +19,8 @@
 - **Countdowns.** Each limit shows when it resets ("Resets in 2h 16m", "Resets Thu 19:59").
 - **Menu bar summary.** The menu bar shows each account's session usage (`64% · 92% · 8%`). Right-click it for a quick list.
 - **Switch VS Code to any account in one click.** Press **Switch** on a card, or pick the account from the menu bar's right-click menu. Claude Code in VS Code changes accounts without signing out; the account it uses has an **In VS Code** tag. This also works with VS Code Insiders, Cursor and Windsurf.
+- **Every account behaves the same.** Each account folder links to `~/.claude`'s settings, memory, chat history, and your own skills and plugins. Account-synced skills from claude.ai stay per account.
+- **Menu bar or screen edge.** Open the panel from the menu bar icon, or rest the pointer on the right edge of the screen and the panel slides in without taking focus.
 - **Warning colours.** A bar turns amber at 75% and red at 90%.
 - **Open at login**, on by default. You can switch it off in Settings.
 - Light and dark mode follow the system.
@@ -41,15 +43,17 @@ To read the limits, the app starts Claude Code for each profile and sends it the
 
 ## Install
 
-There is no signed download yet, so build it from source with [Flutter](https://docs.flutter.dev/get-started/install/macos):
+There is no signed download yet, so build it from source with [Flutter](https://docs.flutter.dev/get-started/install/macos). The build script makes a drag-to-install DMG in `dist/`:
 
 ```sh
 git clone https://github.com/bek-n/usage-monitor.git
 cd usage-monitor
-flutter build macos --release
-cp -R "build/macos/Build/Products/Release/Usage Monitor.app" /Applications/
-open "/Applications/Usage Monitor.app"
+pip3 install dmgbuild
+macos/packaging/make_dmg.sh
+open "dist/Usage Monitor 1.0.0.dmg"
 ```
+
+Drag **Usage Monitor** onto **Applications**, then open it from Applications. The app isn't notarized, so a DMG downloaded from the internet needs a right-click → **Open** the first time.
 
 Then click the gauge icon in the menu bar and choose **Add account**.
 
@@ -61,7 +65,7 @@ Then click the gauge icon in the menu bar and choose **Add account**.
 
 Switching to your main login, or to an account that is the same as your main login, removes the setting again, so Claude Code uses `~/.claude`.
 
-Each account folder has its own Claude Code settings, history and memory, separate from `~/.claude`.
+Account folders share `~/.claude`'s settings, memory and history through links. The app only adds a link where nothing exists yet; if an account already has its own copy of something, its card says so and the app leaves it alone. You can turn linking off in Settings.
 
 To use an account in the terminal, use **Copy terminal command** in the card's ⋯ menu:
 
