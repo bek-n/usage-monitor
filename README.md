@@ -18,7 +18,7 @@
 - **Every account in one panel.** Each account shows its 5-hour session and weekly usage, with per-model weekly limits when your plan has them.
 - **Countdowns.** Each limit shows when it resets ("Resets in 2h 16m", "Resets Thu 19:59").
 - **Menu bar summary.** The menu bar shows each account's session usage (`64% · 92% · 8%`). Right-click it for a quick list.
-- **Shows which account Claude Code is using.** The account Claude Code is signed in with right now gets an **In Claude Code** tag.
+- **Switch VS Code to any account in one click.** Press **Switch** on a card, or pick the account from the menu bar's right-click menu. Claude Code in VS Code changes accounts without signing out; the account it uses has an **In VS Code** tag. This also works with VS Code Insiders, Cursor and Windsurf.
 - **Warning colours.** A bar turns amber at 75% and red at 90%.
 - **Open at login**, on by default. You can switch it off in Settings.
 - Light and dark mode follow the system.
@@ -55,15 +55,19 @@ Then click the gauge icon in the menu bar and choose **Add account**.
 
 > If your browser is already signed in to a different Claude account, sign out there first or open the sign-in link in a private window.
 
-## Use any account without signing out
+## Switching accounts
 
-Each card's ⋯ menu has **Copy terminal command**, for example:
+**Switch** sets `CLAUDE_CONFIG_DIR` in the Claude Code extension's `claudeCode.environmentVariables` setting, in your editor's user `settings.json`. The extension notices within a second, and new Claude chats use the new account. The app changes only that one setting and keeps your comments and formatting. It saves the previous version next to the file as `settings.json.usage-monitor-backup`.
+
+Switching to your main login, or to an account that is the same as your main login, removes the setting again, so Claude Code uses `~/.claude`.
+
+Each account folder has its own Claude Code settings, history and memory, separate from `~/.claude`.
+
+To use an account in the terminal, use **Copy terminal command** in the card's ⋯ menu:
 
 ```sh
 CLAUDE_CONFIG_DIR=~/.claude-accounts/work claude
 ```
-
-In VS Code, the `claudeCode.environmentVariables` setting accepts `CLAUDE_CONFIG_DIR` (as an absolute path) to run the extension with a profile. Each profile folder has its own settings, history and memory.
 
 ## Development
 
@@ -77,6 +81,7 @@ The code is in `lib/src/`:
 | File | What it does |
 |------|--------------|
 | `claude_cli.dart` | Finds the `claude` binary and talks to it |
+| `editor_settings.dart`, `jsonc.dart` | Switches the editor's account by editing its `settings.json` |
 | `monitor.dart` | Keeps the accounts and the refresh schedule |
 | `tray_panel.dart` | The menu bar item and the panel window |
 | `ui/` | The panel's screens |
