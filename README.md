@@ -1,20 +1,61 @@
-# Usage Monitor
+<p align="center">
+  <img src="docs/logo.png" width="128" alt="Usage Monitor icon">
+</p>
 
-A macOS menu bar app that shows the plan usage limits (5-hour session and weekly) of several Claude accounts at once, so you don't have to sign out and back in to check each one.
+<h1 align="center">Usage Monitor</h1>
+
+<p align="center">
+  A macOS menu bar app that shows the plan limits of all your Claude accounts at once.<br>
+  No more signing out and back in just to check how much of a session or week is left.
+</p>
+
+<p align="center">
+  <img src="docs/screenshot.png" width="760" alt="Usage Monitor panel in light and dark mode">
+</p>
+
+## Features
+
+- **Every account in one panel.** Each account shows its 5-hour session and weekly usage, with per-model weekly limits when your plan has them.
+- **Countdowns.** Each limit shows when it resets ("Resets in 2h 16m", "Resets Thu 19:59").
+- **Menu bar summary.** The menu bar shows each account's session usage (`64% · 92% · 8%`). Right-click it for a quick list.
+- **Shows which account Claude Code is using.** The account Claude Code is signed in with right now gets an **In Claude Code** tag.
+- **Warning colours.** A bar turns amber at 75% and red at 90%.
+- **Open at login**, on by default. You can switch it off in Settings.
+- Light and dark mode follow the system.
 
 ## How it works
 
-- Each account lives in its own Claude Code profile folder, `~/.claude-accounts/<name>`. You sign in to each one once with `claude auth login`. Your normal Claude Code login (`~/.claude`) isn't touched.
-- To read the limits, the app starts Claude Code for each profile and sends it the read-only `get_usage` control request, the same data the `/usage` command shows. It sends no prompt and uses no tokens. The app never reads, stores, or sends any login token itself; Claude Code handles authentication.
-- The menu bar shows each account's session usage, for example `71% · 12%`. Click the icon for the full panel; right-click for a quick summary.
-- The account Claude Code is currently signed in with gets an **In Claude Code** tag.
+Each account gets its own Claude Code profile folder: `~/.claude-accounts/<name>`. When you add an account, the app opens Terminal and runs `claude auth login` for that folder, and you sign in once in your browser. Your normal Claude Code login (`~/.claude`) is not touched.
+
+To read the limits, the app starts Claude Code for each profile and sends it the read-only `get_usage` control request. That is the same data the `/usage` command shows.
+
+- **No prompt is sent,** so checking uses none of your limits.
+- **The app never reads, stores or sends a login token.** Claude Code handles authentication itself.
+- Usage is refreshed every 5 minutes by default (1–30 in Settings), when you open the panel, and right after a limit resets.
 
 ## Requirements
 
-- macOS 12 or later.
-- Claude Code, either the CLI or the VS Code / Cursor extension. The app finds the binary automatically; you can also set its path in Settings.
+- macOS 12 or later (macOS 13 or later for Open at login)
+- [Claude Code](https://code.claude.com), either the CLI or the VS Code / Cursor extension. The app finds the `claude` binary by itself; you can set its path in Settings.
+- A Claude Pro, Max, Team or Enterprise plan. API-key logins have no plan limits to show.
 
-## Use another account in the terminal without signing out
+## Install
+
+There is no signed download yet, so build it from source with [Flutter](https://docs.flutter.dev/get-started/install/macos):
+
+```sh
+git clone https://github.com/bek-n/usage-monitor.git
+cd usage-monitor
+flutter build macos --release
+cp -R "build/macos/Build/Products/Release/Usage Monitor.app" /Applications/
+open "/Applications/Usage Monitor.app"
+```
+
+Then click the gauge icon in the menu bar and choose **Add account**.
+
+> If your browser is already signed in to a different Claude account, sign out there first or open the sign-in link in a private window.
+
+## Use any account without signing out
 
 Each card's ⋯ menu has **Copy terminal command**, for example:
 
@@ -22,16 +63,31 @@ Each card's ⋯ menu has **Copy terminal command**, for example:
 CLAUDE_CONFIG_DIR=~/.claude-accounts/work claude
 ```
 
-In VS Code, the `claudeCode.environmentVariables` setting accepts `CLAUDE_CONFIG_DIR` as an absolute path. Note that a profile folder has its own settings, history and memory.
+In VS Code, the `claudeCode.environmentVariables` setting accepts `CLAUDE_CONFIG_DIR` (as an absolute path) to run the extension with a profile. Each profile folder has its own settings, history and memory.
 
-## Build
+## Development
 
 ```sh
-flutter build macos --release
-cp -R "build/macos/Build/Products/Release/Usage Monitor.app" /Applications/
+flutter test
+flutter run -d macos
 ```
+
+The code is in `lib/src/`:
+
+| File | What it does |
+|------|--------------|
+| `claude_cli.dart` | Finds the `claude` binary and talks to it |
+| `monitor.dart` | Keeps the accounts and the refresh schedule |
+| `tray_panel.dart` | The menu bar item and the panel window |
+| `ui/` | The panel's screens |
 
 ## Caveats
 
 - `get_usage` is marked experimental in the Claude Agent SDK, so a future Claude Code release may change it.
-- If you sign in to a profile in a browser that's already signed in to another Claude account, sign out there first or use a private window.
+- macOS only for now.
+
+## License
+
+[MIT](LICENSE)
+
+Usage Monitor is an independent project and is not affiliated with or endorsed by Anthropic. Claude is a trademark of Anthropic, PBC.
