@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../accounts.dart';
 import '../login_item.dart';
 import '../monitor.dart';
+import '../paths.dart';
 import 'theme.dart';
 
 class _DialogTitle extends StatelessWidget {
@@ -67,9 +70,9 @@ Future<({String label, String? email})?> showAddAccountDialog(BuildContext conte
                   onFieldSubmitted: (_) => submit(),
                 ),
                 const SizedBox(height: 12),
-                const _Hint(
-                  'Terminal opens and runs "claude auth login" for a new profile in '
-                  '~/.claude-accounts. Sign in with this account in the browser. '
+                _Hint(
+                  'A terminal window opens and runs "claude auth login" for a new profile in '
+                  '${shortPath(AccountStore.profilesRoot)}. Sign in with this account in the browser. '
                   'Your current Claude Code login stays as it is.',
                 ),
               ],
@@ -178,25 +181,31 @@ Future<void> showSettingsDialog(BuildContext context, Monitor monitor, {required
                 ],
               ),
               const SizedBox(height: 12),
-              const Text('Open the panel from', style: TextStyle(fontSize: 13)),
-              const SizedBox(height: 6),
-              SegmentedButton<PanelPlacement>(
-                showSelectedIcon: false,
-                style: SegmentedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  textStyle: const TextStyle(fontSize: 12.5),
+              if (Platform.isMacOS) ...[
+                const Text('Open the panel from', style: TextStyle(fontSize: 13)),
+                const SizedBox(height: 6),
+                SegmentedButton<PanelPlacement>(
+                  showSelectedIcon: false,
+                  style: SegmentedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    textStyle: const TextStyle(fontSize: 12.5),
+                  ),
+                  segments: const [
+                    ButtonSegment(value: PanelPlacement.menuBar, label: Text('Menu bar')),
+                    ButtonSegment(value: PanelPlacement.screenEdge, label: Text('Right edge of screen')),
+                  ],
+                  selected: {settings.placement},
+                  onSelectionChanged: (s) => setState(() => settings = settings.copyWith(placement: s.first)),
                 ),
-                segments: const [
-                  ButtonSegment(value: PanelPlacement.menuBar, label: Text('Menu bar')),
-                  ButtonSegment(value: PanelPlacement.screenEdge, label: Text('Right edge of screen')),
-                ],
-                selected: {settings.placement},
-                onSelectionChanged: (s) => setState(() => settings = settings.copyWith(placement: s.first)),
-              ),
-              const SizedBox(height: 6),
-              _Hint(settings.placement == PanelPlacement.screenEdge
-                  ? 'Rest the pointer on the right edge of the screen and the panel slides in. The menu bar icon is hidden.'
-                  : 'Click the gauge icon in the menu bar.'),
+                const SizedBox(height: 6),
+                _Hint(settings.placement == PanelPlacement.screenEdge
+                    ? 'Rest the pointer on the right edge of the screen and the panel slides in. The menu bar icon is hidden.'
+                    : 'Click the gauge icon in the menu bar.'),
+              ] else
+                const _Hint(
+                  'Click the gauge icon next to the clock on the taskbar. If Windows hides it behind '
+                  'the ^ arrow, drag it onto the taskbar to keep it in view.',
+                ),
               const SizedBox(height: 4),
               if (loginItemSupported)
                 SwitchListTile(
@@ -213,7 +222,10 @@ Future<void> showSettingsDialog(BuildContext context, Monitor monitor, {required
                 contentPadding: EdgeInsets.zero,
                 dense: true,
                 title: const Text('Same settings and memory for every account', style: TextStyle(fontSize: 13)),
-                subtitle: const _Hint('Links settings, skills, memory and chat history from ~/.claude into each account.'),
+                subtitle: _Hint(
+                  'Links settings, skills, memory and chat history from '
+                  '${Account.currentLogin.shortConfigDir} into each account.',
+                ),
                 value: settings.shareWithMain,
                 onChanged: (v) => setState(() => settings = settings.copyWith(shareWithMain: v)),
               ),

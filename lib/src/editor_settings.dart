@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'jsonc.dart';
+import 'paths.dart';
 
 class Editor {
   const Editor({required this.name, required this.supportFolder, required this.dotFolder});
@@ -11,7 +12,7 @@ class Editor {
 }
 
 class EditorSettings {
-  EditorSettings({String? home}) : home = home ?? Platform.environment['HOME'] ?? '';
+  EditorSettings({String? home}) : home = home ?? homeDir;
 
   static const settingKey = 'claudeCode.environmentVariables';
   static const configDirVariable = 'CLAUDE_CONFIG_DIR';
@@ -25,13 +26,15 @@ class EditorSettings {
 
   final String home;
 
+  String get _userDataRoot => Platform.isWindows ? '$home/AppData/Roaming' : '$home/Library/Application Support';
+
   File settingsFile(Editor editor) =>
-      File('$home/Library/Application Support/${editor.supportFolder}/User/settings.json');
+      File(nativePath('$_userDataRoot/${editor.supportFolder}/User/settings.json'));
 
   Future<List<Editor>> detect() async {
     final found = <Editor>[];
     for (final editor in known) {
-      final extensions = Directory('$home/${editor.dotFolder}/extensions');
+      final extensions = Directory(nativePath('$home/${editor.dotFolder}/extensions'));
       if (!await extensions.exists()) continue;
       final hasClaude = await extensions
           .list()

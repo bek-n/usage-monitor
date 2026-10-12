@@ -189,7 +189,7 @@ class _Body extends StatelessWidget {
               const SizedBox(height: 10),
               Tooltip(
                 message: 'This account has its own ${monitor.ownCopiesOf(account).join(', ')}, '
-                    'so it is not linked to ~/.claude. Remove it from ${account.shortConfigDir} to share it.',
+                    'so it is not linked to ${Account.currentLogin.shortConfigDir}. Remove it from ${account.shortConfigDir} to share it.',
                 child: Row(
                   children: [
                     Icon(Icons.link_off_rounded, size: 13, color: palette.muted),

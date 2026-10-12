@@ -8,6 +8,7 @@ import 'accounts.dart';
 import 'claude_cli.dart';
 import 'editor_settings.dart';
 import 'login_item.dart';
+import 'paths.dart';
 import 'profile_sync.dart';
 import 'usage.dart';
 
@@ -86,7 +87,7 @@ class Monitor extends ChangeNotifier {
     if (editor == null) return false;
     final dir = _editorConfigDir;
     if (dir == null) return account.isCurrentLogin || _matchesMainLogin(account);
-    return !account.isCurrentLogin && _samePath(account.configDir, dir);
+    return !account.isCurrentLogin && samePath(account.configDir, dir);
   }
 
   bool canSwitch(Account account) =>
@@ -110,11 +111,6 @@ class Monitor extends ChangeNotifier {
       _editorConfigDir = primary == null ? null : await editorSettings.configDir(primary);
     } on FileSystemException catch (_) {
     } on FormatException catch (_) {}
-  }
-
-  static bool _samePath(String a, String b) {
-    String clean(String p) => p.endsWith('/') ? p.substring(0, p.length - 1) : p;
-    return clean(a) == clean(b);
   }
 
   List<Account> get _polledAccounts => [Account.currentLogin, ..._profiles];

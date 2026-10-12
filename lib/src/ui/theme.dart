@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class Palette extends ThemeExtension<Palette> {
@@ -99,7 +100,7 @@ ThemeData buildTheme(Brightness brightness) {
     scaffoldBackgroundColor: palette.background,
     extensions: [palette],
     visualDensity: VisualDensity.compact,
-    textTheme: Typography.material2021(platform: TargetPlatform.macOS)
+    textTheme: Typography.material2021(platform: defaultTargetPlatform)
         .black
         .apply(bodyColor: palette.text, displayColor: palette.text),
     dividerTheme: DividerThemeData(color: palette.border, space: 1, thickness: 1),

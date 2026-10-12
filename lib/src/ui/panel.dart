@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../accounts.dart';
 import '../monitor.dart';
+import '../paths.dart';
 import '../tray_panel.dart';
 import 'account_card.dart';
 import 'dialogs.dart';
@@ -148,7 +150,7 @@ class _AccountList extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Add each Claude account once. Each one gets its own Claude Code profile '
-            'in ~/.claude-accounts, so you never have to sign out to check another account.',
+            'in ${shortPath(AccountStore.profilesRoot)}, so you never have to sign out to check another account.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, height: 1.4, color: palette.muted),
           ),

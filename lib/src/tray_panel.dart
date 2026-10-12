@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:tray_manager/tray_manager.dart';
@@ -14,6 +15,9 @@ class TrayPanel with TrayListener, WindowListener {
   TrayPanel(this.monitor) {
     edge = EdgePanel(onShown: () => monitor.refreshIfStale());
   }
+
+  /// The Windows runner sends `reopen` when the app is started while it is already running.
+  static const _appChannel = MethodChannel('usage_monitor/app');
 
   static const panelWidth = 380.0;
   static const minPanelHeight = 180.0;
@@ -30,10 +34,16 @@ class TrayPanel with TrayListener, WindowListener {
   double _roomForDialog = 0;
   String _lastTitle = '';
 
+  /// Set while the panel sits above a bottom taskbar, so that it grows upwards.
+  double? _anchoredBottom;
+
   Future<void> init() async {
     await windowManager.setPreventClose(true);
-    await windowManager.setVisibleOnAllWorkspaces(true, visibleOnFullScreen: true);
+    if (Platform.isMacOS) await windowManager.setVisibleOnAllWorkspaces(true, visibleOnFullScreen: true);
     edge.listen();
+    _appChannel.setMethodCallHandler((call) async {
+      if (call.method == 'reopen') await showPanel();
+    });
     trayManager.addListener(this);
     windowManager.addListener(this);
     monitor.addListener(_onMonitorChanged);
@@ -47,7 +57,7 @@ class TrayPanel with TrayListener, WindowListener {
   bool get edgeMode => _placement == PanelPlacement.screenEdge;
 
   Future<void> _onMonitorChanged() async {
-    final placement = monitor.settings.placement;
+    final placement = Platform.isMacOS ? monitor.settings.placement : PanelPlacement.menuBar;
     if (placement != _placement) {
       final previous = _placement;
       _placement = placement;
@@ -61,7 +71,10 @@ class TrayPanel with TrayListener, WindowListener {
         _trayVisible = false;
         _lastTitle = '';
       } else if (!edgeMode && !_trayVisible) {
-        await trayManager.setIcon('assets/tray_icon.png', isTemplate: true);
+        await trayManager.setIcon(
+          Platform.isWindows ? 'assets/tray_icon.ico' : 'assets/tray_icon.png',
+          isTemplate: true,
+        );
         _trayVisible = true;
       }
       if (wasVisible) await showPanel();
@@ -71,7 +84,7 @@ class TrayPanel with TrayListener, WindowListener {
 
   Future<void> _syncTray() async {
     final title = monitor.menuBarTitle;
-    if (title != _lastTitle) {
+    if (Platform.isMacOS && title != _lastTitle) {
       _lastTitle = title;
       await trayManager.setTitle(title.isEmpty ? '' : ' $title');
     }
@@ -117,8 +130,10 @@ class TrayPanel with TrayListener, WindowListener {
   }
 
   Future<Offset> _panelPosition() async {
+    _anchoredBottom = null;
     final displays = await screenRetriever.getAllDisplays();
     final tray = await trayManager.getBounds();
+    if (Platform.isWindows) return _panelPositionNearTaskbar(displays, tray);
     if (tray != null && tray.width > 0) {
       for (final display in displays) {
         final top = display.visiblePosition?.dy ?? 0;
@@ -145,6 +160,23 @@ class TrayPanel with TrayListener, WindowListener {
     return Offset(origin.dx + size.width - panelWidth - 12, origin.dy + 8);
   }
 
+  /// Opens next to the tray icon like the system's own flyouts, on whichever edge the taskbar is.
+  Future<Offset> _panelPositionNearTaskbar(List<Display> displays, Rect? tray) async {
+    final anchor = tray != null && tray.width > 0 ? tray.center : await screenRetriever.getCursorScreenPoint();
+    Rect workArea(Display d) => (d.visiblePosition ?? Offset.zero) & (d.visibleSize ?? d.size);
+    double distance(Rect area) {
+      final dx = [area.left - anchor.dx, 0.0, anchor.dx - area.right].reduce((a, b) => a > b ? a : b);
+      final dy = [area.top - anchor.dy, 0.0, anchor.dy - area.bottom].reduce((a, b) => a > b ? a : b);
+      return dx * dx + dy * dy;
+    }
+
+    final area = displays.map(workArea).reduce((a, b) => distance(a) <= distance(b) ? a : b);
+    final x = (anchor.dx - panelWidth / 2).clamp(area.left + 12, area.right - panelWidth - 12);
+    if (anchor.dy < area.center.dy) return Offset(x, area.top + 12);
+    final bottom = _anchoredBottom = area.bottom - 12;
+    return Offset(x, bottom - _panelHeight);
+  }
+
   Future<void> hidePanel() async {
     _hiddenAt = DateTime.now();
     if (edgeMode) {
@@ -163,6 +195,9 @@ class TrayPanel with TrayListener, WindowListener {
     _panelHeight = target;
     if (edgeMode) {
       await edge.resize(target);
+    } else if (_anchoredBottom case final bottom?) {
+      final position = await windowManager.getPosition();
+      await windowManager.setBounds(Rect.fromLTWH(position.dx, bottom - target, panelWidth, target));
     } else {
       await windowManager.setSize(Size(panelWidth, target));
     }
@@ -247,4 +282,7 @@ class TrayPanel with TrayListener, WindowListener {
 
   @override
   void onWindowClose() => hidePanel();
+
+  @override
+  void onWindowMoved() => _anchoredBottom = null;
 }

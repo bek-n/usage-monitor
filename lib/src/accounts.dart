@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import 'paths.dart';
+
 class Account {
   const Account({
     required this.id,
@@ -16,7 +18,7 @@ class Account {
   static final currentLogin = Account(
     id: currentLoginId,
     label: 'Main login',
-    configDir: '${Platform.environment['HOME']}/.claude',
+    configDir: nativePath('$homeDir/.claude'),
   );
 
   final String id;
@@ -26,14 +28,9 @@ class Account {
 
   bool get isCurrentLogin => id == currentLoginId;
 
-  bool get isManagedProfile => configDir.startsWith('${AccountStore.profilesRoot}/');
+  bool get isManagedProfile => configDir.startsWith('${AccountStore.profilesRoot}${Platform.pathSeparator}');
 
-  String get shortConfigDir {
-    final home = Platform.environment['HOME'] ?? '';
-    return home.isNotEmpty && configDir.startsWith(home)
-        ? '~${configDir.substring(home.length)}'
-        : configDir;
-  }
+  String get shortConfigDir => shortPath(configDir);
 
   Account copyWith({String? label}) =>
       Account(id: id, label: label ?? this.label, configDir: configDir, email: email);
@@ -109,7 +106,7 @@ class MonitorSettings {
 }
 
 class AccountStore {
-  static final profilesRoot = '${Platform.environment['HOME']}/.claude-accounts';
+  static final profilesRoot = nativePath('$homeDir/.claude-accounts');
 
   File? _file;
 
@@ -151,10 +148,10 @@ class AccountStore {
     final base = _slug(label);
     var slug = base;
     var n = 2;
-    while (await Directory('$profilesRoot/$slug').exists()) {
+    while (await Directory(nativePath('$profilesRoot/$slug')).exists()) {
       slug = '$base-${n++}';
     }
-    final dir = Directory('$profilesRoot/$slug');
+    final dir = Directory(nativePath('$profilesRoot/$slug'));
     await dir.create(recursive: true);
     return Account(
       id: '${DateTime.now().microsecondsSinceEpoch}',

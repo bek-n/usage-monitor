@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'paths.dart';
+
 class ShareReport {
   const ShareReport({this.linked = const [], this.ownCopies = const []});
 
@@ -8,7 +10,7 @@ class ShareReport {
 }
 
 class ProfileSync {
-  ProfileSync({String? mainDir}) : mainDir = mainDir ?? '${Platform.environment['HOME']}/.claude';
+  ProfileSync({String? mainDir}) : mainDir = mainDir ?? nativePath('$homeDir/.claude');
 
   static const wholeItems = [
     'settings.json',
@@ -30,35 +32,34 @@ class ProfileSync {
     final ownCopies = <String>[];
 
     Future<void> link(String relative, String source) async {
-      final path = '$profileDir/$relative';
+      final path = nativePath('$profileDir/$relative');
       switch (await _type(path)) {
         case FileSystemEntityType.notFound:
-          await Link(path).create(source);
-          linked.add(relative);
+          if (await _createLink(path, source)) linked.add(relative);
         case FileSystemEntityType.link:
-          if (await Link(path).target() != source) ownCopies.add(relative);
+          if (!samePath(await Link(path).target(), source)) ownCopies.add(relative);
         default:
           ownCopies.add(relative);
       }
     }
 
     for (final name in wholeItems) {
-      final source = '$mainDir/$name';
+      final source = nativePath('$mainDir/$name');
       if (await _type(source) != FileSystemEntityType.notFound) await link(name, source);
     }
 
     for (final folder in perEntryFolders) {
-      final mainFolder = Directory('$mainDir/$folder');
+      final mainFolder = Directory(nativePath('$mainDir/$folder'));
       if (!await mainFolder.exists()) continue;
       final entries = await mainFolder.list(followLinks: false).toList();
       final shareable = entries.where((e) {
-        final name = _name(e.path);
+        final name = fileName(e.path);
         return !accountOwnedEntries.contains(name) && !name.startsWith('plugin-directory-cache');
       });
       if (shareable.isEmpty) continue;
-      await Directory('$profileDir/$folder').create(recursive: true);
+      await Directory(nativePath('$profileDir/$folder')).create(recursive: true);
       for (final entry in shareable) {
-        await link('$folder/${_name(entry.path)}', entry.path);
+        await link('$folder/${fileName(entry.path)}', entry.path);
       }
     }
 
@@ -67,5 +68,20 @@ class ProfileSync {
 
   static Future<FileSystemEntityType> _type(String path) => FileSystemEntity.type(path, followLinks: false);
 
-  static String _name(String path) => path.split('/').where((s) => s.isNotEmpty).last;
+  /// Symbolic links need Developer Mode on Windows, so folders fall back to a
+  /// junction there. Files are left unlinked when neither works.
+  static Future<bool> _createLink(String path, String source) async {
+    if (!Platform.isWindows) {
+      await Link(path).create(source);
+      return true;
+    }
+    try {
+      await Link(path).create(source);
+      return true;
+    } on FileSystemException catch (_) {
+      if (!await FileSystemEntity.isDirectory(source)) return false;
+      final result = await Process.run('cmd', ['/c', 'mklink', '/J', path, source]);
+      return result.exitCode == 0;
+    }
+  }
 }
